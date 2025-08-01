@@ -94,45 +94,47 @@ def analyze_sentiment(reviews):
         "neutral_percentage": round(neutral_percentage, 2),
         "top_positive_reviews": positive_reviews[:5],
         "top_negative_reviews": negative_reviews[:5],
-        "insights_for_manager": insights,
+"insights_for_manager": insights[:5],
         "detailed_sentiments": sentiments
     }
 
 def generate_insights(sentiments_data, overall_sentiment):
     """
-    Generates exactly 5 key insights for a manager based on sentiment analysis results.
+    Generates exactly 5 actionable insights for a manager based on sentiment analysis results.
     """
     insights = []
+    total_reviews = len(sentiments_data)
+    positive_count = len([s for s in sentiments_data if s['sentiment'] == 'positive'])
+    negative_count = len([s for s in sentiments_data if s['sentiment'] == 'negative'])
+    neutral_count = len([s for s in sentiments_data if s['sentiment'] == 'neutral'])
+    
+    positive_percentage = (positive_count / total_reviews) * 100 if total_reviews > 0 else 0
+    negative_percentage = (negative_count / total_reviews) * 100 if total_reviews > 0 else 0
+    
     print(f"DEBUG: Generating insights for overall sentiment: {overall_sentiment}")
     
     # Define common words to exclude for more meaningful feature extraction
     common_positive_words = {"great", "good", "love", "excellent", "best", "product", "very", "would", "really", "much", "well", "amazing", "highly", "recommend", "happy", "perfectly", "quick"}
     common_negative_words = {"bad", "poor", "issue", "problem", "not", "disappointed", "worst", "product", "very", "would", "really", "much", "well", "terrible", "waste", "away", "buggy", "crashes"}
 
-    # Calculate statistics
-    total_reviews = len(sentiments_data)
-    positive_reviews = [s for s in sentiments_data if s['sentiment'] == 'positive']
-    negative_reviews = [s for s in sentiments_data if s['sentiment'] == 'negative']
-    neutral_reviews = [s for s in sentiments_data if s['sentiment'] == 'neutral']
-    
-    positive_count = len(positive_reviews)
-    negative_count = len(negative_reviews)
-    neutral_count = len(neutral_reviews)
-    
-    positive_percentage = (positive_count / total_reviews * 100) if total_reviews > 0 else 0
-    negative_percentage = (negative_count / total_reviews * 100) if total_reviews > 0 else 0
-    neutral_percentage = (neutral_count / total_reviews * 100) if total_reviews > 0 else 0
-
-    # Insight 1: Overall Product Sentiment
+    # Insight 1: Overall sentiment assessment
     if overall_sentiment == "Positive":
-        insights.append(f"Product is generally well-received with {positive_percentage:.1f}% positive reviews. Customers are satisfied with the product quality and performance.")
+        insights.append(f"Overall Customer Satisfaction: {positive_percentage:.1f}% of reviews are positive, indicating strong customer satisfaction with this product.")
     elif overall_sentiment == "Negative":
-        insights.append(f"Product has significant issues with {negative_percentage:.1f}% negative reviews. Immediate attention required to address customer concerns.")
+        insights.append(f"Critical Issues Detected: {negative_percentage:.1f}% of reviews are negative, requiring immediate attention to address customer concerns.")
     else:
-        insights.append(f"Product has mixed reviews with {positive_percentage:.1f}% positive, {negative_percentage:.1f}% negative, and {neutral_percentage:.1f}% neutral feedback.")
-
-    # Insight 2: Key Features Mentioned
-    positive_reviews_text = [s['processed_review'] for s in positive_reviews]
+        insights.append(f"Mixed Reception: Reviews are balanced with {positive_percentage:.1f}% positive and {negative_percentage:.1f}% negative, suggesting room for improvement.")
+    
+    # Insight 2: Review volume and engagement
+    if total_reviews >= 50:
+        insights.append(f"High Engagement: With {total_reviews} reviews analyzed, this product has strong customer engagement and market presence.")
+    elif total_reviews >= 20:
+        insights.append(f"Moderate Engagement: {total_reviews} reviews indicate decent customer interaction, but more feedback could provide better insights.")
+    else:
+        insights.append(f"Limited Feedback: Only {total_reviews} reviews available. Consider strategies to encourage more customer reviews for comprehensive analysis.")
+    
+    # Insight 3: Positive feature analysis
+    positive_reviews_text = [s['processed_review'] for s in sentiments_data if s['sentiment'] == 'positive']
     if positive_reviews_text:
         common_words = {}
         for review in positive_reviews_text:
@@ -141,17 +143,17 @@ def generate_insights(sentiments_data, overall_sentiment):
                 if len(word) > 3 and word not in common_positive_words:
                     common_words[word] = common_words.get(word, 0) + 1
         
-        if common_words:
-            top_features = sorted(common_words.items(), key=lambda x: x[1], reverse=True)[:3]
-            feature_names = [word.capitalize() for word, count in top_features]
-            insights.append(f"Key positive features mentioned: {', '.join(feature_names)}. These are the main selling points customers appreciate.")
+        sorted_common_words = sorted(common_words.items(), key=lambda item: item[1], reverse=True)
+        if sorted_common_words[:3]:
+            top_features = [word for word, count in sorted_common_words[:3]]
+            insights.append(f"Key Strengths: Customers frequently praise '{', '.join(top_features)}'. Leverage these strengths in marketing and product positioning.")
         else:
-            insights.append("No specific features were frequently mentioned in positive reviews.")
+            insights.append("Positive Feedback: Customers express satisfaction, though specific features aren't clearly highlighted in reviews.")
     else:
-        insights.append("No positive reviews to extract key features from.")
-
-    # Insight 3: Issues/Problems
-    negative_reviews_text = [s['processed_review'] for s in negative_reviews]
+        insights.append("Limited Positive Feedback: Few positive reviews available. Focus on understanding what customers value most.")
+    
+    # Insight 4: Areas for improvement
+    negative_reviews_text = [s['processed_review'] for s in sentiments_data if s['sentiment'] == 'negative']
     if negative_reviews_text:
         common_words = {}
         for review in negative_reviews_text:
@@ -160,53 +162,30 @@ def generate_insights(sentiments_data, overall_sentiment):
                 if len(word) > 3 and word not in common_negative_words:
                     common_words[word] = common_words.get(word, 0) + 1
         
-        if common_words:
-            top_issues = sorted(common_words.items(), key=lambda x: x[1], reverse=True)[:3]
-            issue_names = [word.capitalize() for word, count in top_issues]
-            insights.append(f"Main issues reported: {', '.join(issue_names)}. These problems need immediate attention and improvement.")
+        sorted_common_words = sorted(common_words.items(), key=lambda item: item[1], reverse=True)
+        if sorted_common_words[:3]:
+            top_issues = [word for word, count in sorted_common_words[:3]]
+            insights.append(f"Improvement Areas: Common concerns include '{', '.join(top_issues)}'. Address these issues to reduce negative feedback.")
         else:
-            insights.append("No specific issues were frequently mentioned in negative reviews.")
+            insights.append("Negative Feedback: Some dissatisfaction exists, but specific issues aren't clearly identifiable from review text.")
     else:
-        insights.append("No negative reviews to extract issues from.")
-
-    # Insight 4: Purchase/Recommendation Insights
-    recommendation_keywords = ["recommend", "buy", "purchase", "worth", "value", "money", "price", "cost"]
-    recommendation_reviews = []
+        insights.append("Minimal Complaints: Very few negative reviews suggest the product meets most customer expectations.")
     
-    for review in sentiments_data:
-        review_lower = review['processed_review'].lower()
-        if any(keyword in review_lower for keyword in recommendation_keywords):
-            recommendation_reviews.append(review)
+    # Insight 5: Strategic recommendations
+    if positive_percentage > 70:
+        insights.append("Strategic Recommendation: Strong positive sentiment suggests this product is market-ready for expansion and premium positioning.")
+    elif negative_percentage > 50:
+        insights.append("Strategic Recommendation: High negative sentiment requires immediate product review, quality improvements, or customer service enhancement.")
+    elif neutral_count > total_reviews * 0.4:
+        insights.append("Strategic Recommendation: High neutral sentiment indicates customers are indifferent. Consider adding unique features or value propositions.")
+    else:
+        insights.append("Strategic Recommendation: Balanced feedback suggests steady performance. Monitor trends and gather targeted feedback for optimization.")
     
-    if recommendation_reviews:
-        positive_recs = [r for r in recommendation_reviews if r['sentiment'] == 'positive']
-        negative_recs = [r for r in recommendation_reviews if r['sentiment'] == 'negative']
-        
-        if positive_recs and negative_recs:
-            insights.append(f"Purchase recommendations: {len(positive_recs)} customers would recommend buying, {len(negative_recs)} would not recommend.")
-        elif positive_recs:
-            insights.append(f"Purchase recommendations: {len(positive_recs)} customers would recommend buying this product.")
-        elif negative_recs:
-            insights.append(f"Purchase recommendations: {len(negative_recs)} customers would not recommend buying this product.")
-        else:
-            insights.append("Limited purchase recommendation data available in reviews.")
-    else:
-        insights.append("No specific purchase or recommendation mentions found in reviews.")
-
-    # Insight 5: Overall Review Summary
-    if total_reviews > 0:
-        if positive_percentage > 70:
-            insights.append(f"Overall: Excellent product with {positive_count} out of {total_reviews} customers giving positive feedback. Strong market position.")
-        elif positive_percentage > 50:
-            insights.append(f"Overall: Good product with {positive_count} out of {total_reviews} customers satisfied. Room for improvement.")
-        elif negative_percentage > 50:
-            insights.append(f"Overall: Poor product with {negative_count} out of {total_reviews} customers dissatisfied. Needs major improvements.")
-        else:
-            insights.append(f"Overall: Mixed product with {positive_count} positive, {negative_count} negative, and {neutral_count} neutral reviews out of {total_reviews} total.")
-    else:
-        insights.append("Overall: No reviews available for analysis.")
-
-    return insights[:5]  # Ensure exactly 5 insights
+    # Ensure exactly 5 insights
+    while len(insights) < 5:
+        insights.append("Additional Analysis: More comprehensive data collection recommended for deeper insights into customer preferences and market positioning.")
+    
+    return insights[:5]
 
 # Example Usage for testing this specific module - now without hardcoded reviews for primary logic
 if __name__ == '__main__':

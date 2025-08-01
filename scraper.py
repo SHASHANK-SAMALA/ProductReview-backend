@@ -22,23 +22,14 @@ REVIEW_SELECTORS = [
     '[data-review]',
     '[class*="review"]',
     '[id*="review"]',
-    '.customer-review',
-    '.product-review',
-    '.user-review',
-    '.comment',
-    '.feedback',
-    '.testimonial',
 ]
 
-# Fallback keywords to sniff out "review-like" paragraphs
+# Fallback keywords to sniff out “review-like” paragraphs
 REVIEW_KEYWORDS = [
     "good", "bad", "excellent", "poor",
     "worst", "nice", "awesome", "terrible",
     "satisfied", "unsatisfied", "recommend",
     "disappointed", "love", "hate",
-    "great", "amazing", "horrible", "perfect",
-    "quality", "worth", "value", "price",
-    "delivery", "service", "product", "item"
 ]
 
 def scrape_reviews(url: str, max_reviews: int = 6000) -> list[str]:
@@ -46,32 +37,23 @@ def scrape_reviews(url: str, max_reviews: int = 6000) -> list[str]:
     Enhanced review scraper to handle large datasets.
     Returns up to `max_reviews` review texts from any site.
     """
-    print(f"DEBUG: Starting to scrape reviews from: {url}")
-    
     # —— Setup headless Chrome —— #
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
     ua = random.choice(HEADERS_LIST)
     options.add_argument(f"user-agent={ua}")
 
-    driver = None
+    driver = webdriver.Chrome(options=options)
     reviews = []
 
     try:
-        print("DEBUG: Initializing Chrome driver...")
-        driver = webdriver.Chrome(options=options)
-        
-        print("DEBUG: Navigating to URL...")
         driver.get(url)
-        time.sleep(5)  # allow JS to load
+        time.sleep(3)  # allow JS to load
 
-        print("DEBUG: Starting to scroll to load more content...")
         # Scroll to bottom multiple times to load more reviews
-        for i in range(5):  # Reduced scrolls for faster processing
+        for i in range(10):  # Adjust the number of scrolls based on site behavior
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
             print(f"DEBUG: Scroll iteration {i+1} completed.")
@@ -79,24 +61,20 @@ def scrape_reviews(url: str, max_reviews: int = 6000) -> list[str]:
         html = driver.page_source
         soup = BeautifulSoup(html, "html.parser")
 
-        print("DEBUG: Extracting reviews using structured selectors...")
         # Extract reviews using structured selectors
         for sel in REVIEW_SELECTORS:
-            elements = soup.select(sel)
-            print(f"DEBUG: Found {len(elements)} elements with selector: {sel}")
-            for el in elements:
+            for el in soup.select(sel):
                 text = el.get_text(" ", strip=True)
                 if len(text) > 30:
                     reviews.append(text)
                     if len(reviews) >= max_reviews:
                         break
-            if len(reviews) >= max_reviews:
+            if reviews:
                 break
 
         # Fallback: Extract review-like content
         if not reviews:
-            print("DEBUG: No reviews found with structured selectors, trying fallback method...")
-            for tag in soup.find_all(["p", "span", "div"]):
+            for tag in soup.find_all(["p", "span"]):
                 txt = tag.get_text(" ", strip=True)
                 low = txt.lower()
                 if len(txt) > 40 and any(kw in low for kw in REVIEW_KEYWORDS):
@@ -104,25 +82,12 @@ def scrape_reviews(url: str, max_reviews: int = 6000) -> list[str]:
                     if len(reviews) >= max_reviews:
                         break
 
-        print(f"DEBUG: Total reviews extracted: {len(reviews)}")
-
     except Exception as e:
         print(f"[scraper.py] ERROR during scrape: {e}")
-        raise e
     finally:
-        if driver:
-            driver.quit()
-            print("DEBUG: Chrome driver closed.")
+        driver.quit()
 
     # Deduplicate reviews
     unique_reviews = list(dict.fromkeys(reviews))
     print(f"DEBUG: Total unique reviews extracted: {len(unique_reviews)}")
-    
-    if not unique_reviews:
-        print("DEBUG: No reviews found. This might be due to:")
-        print("1. The URL doesn't contain review content")
-        print("2. The site uses dynamic loading that requires more time")
-        print("3. The site has anti-scraping measures")
-        print("4. The selectors need to be updated for this specific site")
-    
     return unique_reviews[:max_reviews]

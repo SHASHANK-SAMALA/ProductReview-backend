@@ -1,17 +1,15 @@
 from flask import Flask, request, jsonify
 import os
-from flask_cors import CORS
+from flask_cors import CORS # <--- ADD THIS LINE
 
 # Import your custom modules
-try:
-    from scraper import scrape_reviews
-except ImportError:
-    from scraper_vercel import scrape_reviews_vercel as scrape_reviews
-
-from sentiment_analyzer import analyze_sentiment
+from scraper import scrape_reviews
+# IMPORTANT: Based on your previous sentiment_analyzer.py, you should import analyze_sentiment
+# from that file directly, not from vaderSentiment.vaderSentiment
+from sentiment_analyzer import analyze_sentiment # <--- CORRECTED IMPORT
 
 app = Flask(__name__)
-CORS(app, origins=["*"])
+CORS(app) # <--- ADD THIS LINE (enables CORS for all routes by default)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -22,40 +20,6 @@ def handle_exception(e):
 def home():
     return "Welcome to the Product Review Sentiment Analyzer API! Use the /analyze_sentiment endpoint."
 
-@app.route('/test')
-def test():
-    return jsonify({"status": "success", "message": "Backend is running!"})
-
-@app.route('/test-sentiment')
-def test_sentiment():
-    """Test endpoint that analyzes sample reviews without scraping"""
-    try:
-        sample_reviews = [
-            "This product is amazing! I love the quality and performance.",
-            "Great value for money. Highly recommend this product.",
-            "The product works well but could be better.",
-            "Not satisfied with the quality. Would not recommend.",
-            "Excellent product with good features and reasonable price."
-        ]
-        
-        sentiment_results = analyze_sentiment(sample_reviews)
-        
-        return jsonify({
-            "status": "success",
-            "message": "Test sentiment analysis completed",
-            "summary": {
-                "total_reviews_found": sentiment_results.get("total_reviews", 0),
-                "overall_sentiment": sentiment_results.get("overall_sentiment"),
-                "positive_percentage": sentiment_results.get("positive_percentage"),
-                "negative_percentage": sentiment_results.get("negative_percentage"),
-                "neutral_percentage": sentiment_results.get("neutral_percentage")
-            },
-            "insights_for_manager": sentiment_results.get("insights_for_manager", []),
-            "detailed_sentiments": sentiment_results.get("detailed_sentiments", [])
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 @app.route('/analyze_sentiment', methods=['POST'])
 def get_sentiment():
     try:
@@ -64,7 +28,7 @@ def get_sentiment():
         
         if not data or 'url' not in data:
             print("ERROR (app.py): Invalid request. 'url' not provided in JSON body.")
-            return jsonify({"status": "error", "message": "Please provide a 'url' in the request body."}), 400
+            return jsonify({"error": "Please provide a 'url' in the request body."}), 400
 
         product_url = data['url']
         print(f"DEBUG (app.py): Attempting to analyze URL: {product_url}")
@@ -72,7 +36,7 @@ def get_sentiment():
         # Log the incoming request body for debugging
         print("DEBUG (app.py): Incoming request body:", data)
 
-        # 1. Scrape Reviews using the scraper module
+        # 1. Scrape Reviews using the scraper.py module
         try:
             print("DEBUG (app.py): Calling scrape_reviews function...")
             reviews = scrape_reviews(product_url)
@@ -90,7 +54,7 @@ def get_sentiment():
                 "status": "error",
                 "message": "Could not scrape reviews from the provided URL. Please check the URL or try again later. It might be a dynamic site or have anti-scraping measures.",
                 "url": product_url
-            }), 500
+            }), 500 # Internal Server Error, or 404 if URL truly invalid
 
         print(f"DEBUG (app.py): Successfully scraped {len(reviews)} reviews. Proceeding to sentiment analysis.")
 
@@ -117,20 +81,24 @@ def get_sentiment():
                 "negative_percentage": sentiment_results.get("negative_percentage"),
                 "neutral_percentage": sentiment_results.get("neutral_percentage")
             },
-            "insights_for_manager": sentiment_results.get("insights_for_manager", []),
-            "detailed_sentiments": sentiment_results.get("detailed_sentiments", [])
+            "insights_for_manager": sentiment_results.get("insights_for_manager"),
+            # You might include detailed_sentiments for debugging or if the client wants it
+            "detailed_sentiments": sentiment_results.get("detailed_sentiments") # <-- UNCOMMENTED THIS FOR YOU
         }
 
         print("DEBUG (app.py): Sentiment analysis complete. Sending JSON response.")
-        print("DEBUG (app.py): Response data:", response_data)
         return jsonify(response_data), 200
 
     except Exception as e:
         print(f"ERROR (app.py): {str(e)}")
         return jsonify({"status": "error", "message": "An error occurred during sentiment analysis."}), 500
 
-# For local development
+# Vercel serverless function handler
+def handler(request):
+    return app(request)
+
 if __name__ == '__main__':
+    # For local development:
     port = int(os.environ.get('PORT', 5000))
     print(f"DEBUG (app.py): Starting Flask app on host 0.0.0.0, port {port}")
     app.run(host='0.0.0.0', port=port, debug=True)
