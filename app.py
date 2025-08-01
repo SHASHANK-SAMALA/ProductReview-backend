@@ -3,7 +3,11 @@ import os
 from flask_cors import CORS
 
 # Import your custom modules
-from scraper import scrape_reviews
+try:
+    from scraper import scrape_reviews
+except ImportError:
+    from scraper_vercel import scrape_reviews_vercel as scrape_reviews
+
 from sentiment_analyzer import analyze_sentiment
 
 app = Flask(__name__)
@@ -22,6 +26,36 @@ def home():
 def test():
     return jsonify({"status": "success", "message": "Backend is running!"})
 
+@app.route('/test-sentiment')
+def test_sentiment():
+    """Test endpoint that analyzes sample reviews without scraping"""
+    try:
+        sample_reviews = [
+            "This product is amazing! I love the quality and performance.",
+            "Great value for money. Highly recommend this product.",
+            "The product works well but could be better.",
+            "Not satisfied with the quality. Would not recommend.",
+            "Excellent product with good features and reasonable price."
+        ]
+        
+        sentiment_results = analyze_sentiment(sample_reviews)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Test sentiment analysis completed",
+            "summary": {
+                "total_reviews_found": sentiment_results.get("total_reviews", 0),
+                "overall_sentiment": sentiment_results.get("overall_sentiment"),
+                "positive_percentage": sentiment_results.get("positive_percentage"),
+                "negative_percentage": sentiment_results.get("negative_percentage"),
+                "neutral_percentage": sentiment_results.get("neutral_percentage")
+            },
+            "insights_for_manager": sentiment_results.get("insights_for_manager", []),
+            "detailed_sentiments": sentiment_results.get("detailed_sentiments", [])
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/analyze_sentiment', methods=['POST'])
 def get_sentiment():
     try:
@@ -38,7 +72,7 @@ def get_sentiment():
         # Log the incoming request body for debugging
         print("DEBUG (app.py): Incoming request body:", data)
 
-        # 1. Scrape Reviews using the scraper.py module
+        # 1. Scrape Reviews using the scraper module
         try:
             print("DEBUG (app.py): Calling scrape_reviews function...")
             reviews = scrape_reviews(product_url)
