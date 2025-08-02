@@ -1,27 +1,63 @@
 from flask import Flask, request, jsonify
 import os
-from flask_cors import CORS # <--- ADD THIS LINE
+from flask_cors import CORS
 
 # Import your custom modules
 from scraper import scrape_reviews
 # IMPORTANT: Based on your previous sentiment_analyzer.py, you should import analyze_sentiment
 # from that file directly, not from vaderSentiment.vaderSentiment
-from sentiment_analyzer import analyze_sentiment # <--- CORRECTED IMPORT
+from sentiment_analyzer import analyze_sentiment # <- CORRECTED IMPORT
 
 app = Flask(__name__)
-CORS(app) # <--- ADD THIS LINE (enables CORS for all routes by default)
+# Configure CORS to allow all origins and methods
+CORS(app, 
+     origins=["*"],
+     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+     methods=["GET", "POST", "OPTIONS"],
+     supports_credentials=True)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     print(f"ERROR (app.py): {str(e)}")
     return jsonify({"status": "error", "message": "An unexpected error occurred. Please try again later."}), 500
 
-@app.route('/')
+@app.route('/', methods=['GET', 'OPTIONS'])
 def home():
-    return "Welcome to the Product Review Sentiment Analyzer API! Use the /analyze_sentiment endpoint."
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response
+    
+    response = jsonify({"message": "Welcome to the Product Review Sentiment Analyzer API! Use the /analyze_sentiment endpoint."})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
-@app.route('/analyze_sentiment', methods=['POST'])
+@app.route('/test', methods=['GET', 'OPTIONS'])
+def test():
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response
+    
+    response = jsonify({"status": "success", "message": "Backend is running!"})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+@app.route('/analyze_sentiment', methods=['POST', 'OPTIONS'])
 def get_sentiment():
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response
     try:
         print("DEBUG (app.py): Received request for /analyze_sentiment endpoint.")
         data = request.get_json()
@@ -87,7 +123,9 @@ def get_sentiment():
         }
 
         print("DEBUG (app.py): Sentiment analysis complete. Sending JSON response.")
-        return jsonify(response_data), 200
+        response = jsonify(response_data)
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 200
 
     except Exception as e:
         print(f"ERROR (app.py): {str(e)}")
