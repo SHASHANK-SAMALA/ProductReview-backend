@@ -11,13 +11,16 @@ app = Flask(__name__)
 # ✅ Correct and secure CORS configuration
 CORS(app,
      origins=[
-         "http://localhost:5173",  # Dev
-         "https://opinionpulse.vercel.app",  # Vercel Prod 1
-         "https://product-review-frontend-two.vercel.app"  # Vercel Prod 2
+         "http://localhost:5173",  # Local frontend
+         "http://127.0.0.1:5173",  # Just in case
+         "https://opinionpulse.vercel.app",  # Deployed frontend
+         "https://product-review-frontend-two.vercel.app"
      ],
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"],
      supports_credentials=True)
+
+
 
 @app.errorhandler(Exception)
 def handle_exception(e):
