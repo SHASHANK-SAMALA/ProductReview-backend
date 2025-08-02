@@ -1,93 +1,48 @@
-# scraper.py
-import time
-import random
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+import requests
 from bs4 import BeautifulSoup
+import random
 
-# You can expand this list with any UA strings you like
+SCRAPER_API_KEY = "2276d9f31fc2af6450c024e1e1315066" # Replace with real key
+
 HEADERS_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/118.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/15.1 Safari/605.1.15",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/119.0.0.0 Safari/537.36",
 ]
 
-# Common review-related CSS selectors / attributes
-REVIEW_SELECTORS = [
-    '[itemtype="http://schema.org/Review"]',
-    '[itemprop="reviewBody"]',
-    '.review',
-    '.reviews',
-    '[data-review]',
-    '[class*="review"]',
-    '[id*="review"]',
-]
-
-# Fallback keywords to sniff out “review-like” paragraphs
 REVIEW_KEYWORDS = [
-    "good", "bad", "excellent", "poor",
-    "worst", "nice", "awesome", "terrible",
-    "satisfied", "unsatisfied", "recommend",
-    "disappointed", "love", "hate",
+    "good", "bad", "excellent", "poor", "worst", "nice", "awesome", "terrible",
+    "satisfied", "unsatisfied", "recommend", "disappointed", "love", "hate"
 ]
 
-def scrape_reviews(url: str, max_reviews: int = 6000) -> list[str]:
-    """
-    Enhanced review scraper to handle large datasets.
-    Returns up to `max_reviews` review texts from any site.
-    """
-    # —— Setup headless Chrome —— #
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    ua = random.choice(HEADERS_LIST)
-    options.add_argument(f"user-agent={ua}")
-
-    driver = webdriver.Chrome(options=options)
-    reviews = []
-
+def scrape_reviews(url: str, max_reviews: int = 500) -> list[str]:
     try:
-        driver.get(url)
-        time.sleep(3)  # allow JS to load
+        print(f"🔍 [scraper.py] Fetching: {url}")
 
-        # Scroll to bottom multiple times to load more reviews
-        for i in range(10):  # Adjust the number of scrolls based on site behavior
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
-            print(f"DEBUG: Scroll iteration {i+1} completed.")
+        api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&render=true"
+        headers = {
+            "User-Agent": random.choice(HEADERS_LIST)
+        }
 
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
+        resp = requests.get(api_url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            raise Exception(f"❌ Fetch failed: Status {resp.status_code}")
 
-        # Extract reviews using structured selectors
-        for sel in REVIEW_SELECTORS:
-            for el in soup.select(sel):
-                text = el.get_text(" ", strip=True)
-                if len(text) > 30:
-                    reviews.append(text)
-                    if len(reviews) >= max_reviews:
-                        break
-            if reviews:
-                break
+        soup = BeautifulSoup(resp.text, "html.parser")
+        reviews = []
 
-        # Fallback: Extract review-like content
-        if not reviews:
-            for tag in soup.find_all(["p", "span"]):
-                txt = tag.get_text(" ", strip=True)
-                low = txt.lower()
-                if len(txt) > 40 and any(kw in low for kw in REVIEW_KEYWORDS):
-                    reviews.append(txt)
-                    if len(reviews) >= max_reviews:
-                        break
+        for tag in soup.find_all(["p", "span", "div"]):
+            txt = tag.get_text(" ", strip=True)
+            low = txt.lower()
+            if len(txt) > 40 and any(kw in low for kw in REVIEW_KEYWORDS):
+                reviews.append(txt)
+                if len(reviews) >= max_reviews:
+                    break
+
+        unique_reviews = list(dict.fromkeys(reviews))
+        print(f"✅ [scraper.py] Reviews scraped: {len(unique_reviews)}")
+        return unique_reviews
 
     except Exception as e:
-        print(f"[scraper.py] ERROR during scrape: {e}")
-    finally:
-        driver.quit()
-
-    # Deduplicate reviews
-    unique_reviews = list(dict.fromkeys(reviews))
-    print(f"DEBUG: Total unique reviews extracted: {len(unique_reviews)}")
-    return unique_reviews[:max_reviews]
+        print(f"❌ [scraper.py] Error: {e}")
+        return []
